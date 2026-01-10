@@ -19,10 +19,8 @@ out/
 *.dll
 *.so
 *.dylib
-dapodik-proxy
-dapodik-proxy-*
-installer
-installer-*
+# Binaries built in root should be named specifically or moved to dist/
+# Avoid generic names that match source directories
 
 # ==================================
 # Go Build Files
