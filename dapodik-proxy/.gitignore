@@ -57,6 +57,7 @@ vendor/
 *.temp
 *.pid
 *.lock
+access_token.txt
 
 # ==================================
 # OS Files

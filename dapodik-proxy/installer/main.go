@@ -1,11 +1,15 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -15,6 +19,26 @@ const (
 	firewallRule   = "DapodikProxy-8888"
 	defaultPort    = "8888"
 )
+
+// Config struct to match proxy config
+type Config struct {
+	Server struct {
+		Port         int      `yaml:"port"`
+		ReadTimeout  int      `yaml:"read_timeout"`
+		WriteTimeout int      `yaml:"write_timeout"`
+		AllowedIPs   []string `yaml:"allowed_ips"`
+	} `yaml:"server"`
+	Dapodik struct {
+		BaseURL string `yaml:"base_url"`
+	} `yaml:"dapodik"`
+	Logging struct {
+		Level  string `yaml:"level"`
+		Pretty bool   `yaml:"pretty"`
+	} `yaml:"logging"`
+	Security struct {
+		APIKey string `yaml:"api_key"`
+	} `yaml:"security"`
+}
 
 func main() {
 	fmt.Println("╔══════════════════════════════════════════════════════════════╗")
@@ -110,7 +134,14 @@ func installService(exePath, configPath, workDir string) {
 		fmt.Println()
 	}
 
+	// Handle API Key generation
+	apiKey, err := ensureAPIKey(configPath)
+	if err != nil {
+		fmt.Printf("⚠️  Warning: Failed to handle API Key: %v\n", err)
+	}
+
 	// Create service using sc.exe
+
 	fmt.Println("→ Creating Windows service...")
 
 	binPath := fmt.Sprintf("\"%s\" -config \"%s\"", exePath, configPath)
@@ -174,11 +205,67 @@ func installService(exePath, configPath, workDir string) {
 	fmt.Println("✅ INSTALLATION COMPLETE!")
 	fmt.Println("════════════════════════════════════════════════════════════")
 	fmt.Println()
+
+	if apiKey != "" {
+		fmt.Println("🔐 SECURITY NOTICE:")
+		fmt.Printf("   API Key generated: %s\n", apiKey)
+		fmt.Println("   This key has been saved to config.yaml and access_token.txt")
+		fmt.Println("   Keep this key secret! Use it in the 'X-API-Key' header from your main app.")
+		fmt.Println()
+
+		// Save to access_token.txt for easy copy-paste
+		tokenFilePath := filepath.Join(filepath.Dir(configPath), "access_token.txt")
+		os.WriteFile(tokenFilePath, []byte(apiKey), 0644)
+	}
+
 	fmt.Printf("Service '%s' has been installed and started.\n", serviceName)
 	fmt.Println("It will start automatically on system boot.")
 	fmt.Println()
 	fmt.Printf("Health Check: http://localhost:%s/health\n", defaultPort)
 	fmt.Println()
+}
+
+func ensureAPIKey(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return "", err
+	}
+
+	// If API Key already exists, don't change it
+	if config.Security.APIKey != "" {
+		return config.Security.APIKey, nil
+	}
+
+	// Generate new random API Key
+	fmt.Println("→ Generating secure API Key...")
+	newKey := generateRandomKey(32)
+	config.Security.APIKey = newKey
+
+	// Marshal back to YAML
+	newData, err := yaml.Marshal(&config)
+	if err != nil {
+		return "", err
+	}
+
+	if err := os.WriteFile(path, newData, 0644); err != nil {
+		return "", err
+	}
+
+	return newKey, nil
+}
+
+func generateRandomKey(length int) string {
+	b := make([]byte, length/2)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to simpler random if crypto/rand fails
+		return "proxy-secret-key-" + hex.EncodeToString([]byte(serviceName))[:8]
+	}
+	return hex.EncodeToString(b)
 }
 
 func uninstallService() {

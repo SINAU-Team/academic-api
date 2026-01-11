@@ -86,12 +86,18 @@ func main() {
 		Str("dapodik_base_url", config.Dapodik.BaseURL).
 		Msg("Starting Dapodik Proxy Server")
 
+	authStatus := "Disabled (Insecure)"
+	if config.Security.APIKey != "" {
+		authStatus = "Enabled (Secure)"
+	}
+
 	fmt.Printf("\n")
 	fmt.Printf("╔══════════════════════════════════════════════════════════════╗\n")
 	fmt.Printf("║           DAPODIK PROXY SERVER                               ║\n")
 	fmt.Printf("╠══════════════════════════════════════════════════════════════╣\n")
 	fmt.Printf("║  Status  : Running                                           ║\n")
 	fmt.Printf("║  Port    : %-49d ║\n", config.Server.Port)
+	fmt.Printf("║  Security: %-49s ║\n", authStatus)
 	fmt.Printf("║  Health  : http://localhost:%-33s ║\n", fmt.Sprintf("%d/health", config.Server.Port))
 	fmt.Printf("╠══════════════════════════════════════════════════════════════╣\n")
 	fmt.Printf("║  Usage Example:                                              ║\n")
